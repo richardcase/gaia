@@ -32,6 +32,9 @@ export function makeHttpServer(config: Object) {
   } else if (config.driver === 'google-cloud') {
     const GcDriver = require('./drivers/GcDriver')
     driver = new GcDriver(config)
+  } else if (config.driver === 'github') {
+    const GhDriver = require('./drivers/GhDriver')
+    driver = new GhDriver(config)
   } else if (config.driverClass) {
     driver = new config.driverClass(config)
   } else {

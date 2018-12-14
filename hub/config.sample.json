@@ -22,6 +22,16 @@
     "projectId": ""
   },
 
+  "ghConfig": {
+    "authtype": "",
+    "token": "",
+    "baseurl": "",
+    "owner": "",
+    "repo": "",
+    "path": "",
+    "ref": ""
+  },
+
   "argsTransport": {
     "level": "warn",
     "handleExceptions": true,
