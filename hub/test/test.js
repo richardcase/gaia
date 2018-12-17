@@ -7,6 +7,7 @@ let request = require('supertest')
 let bitcoin = require('bitcoinjs-lib')
 let fs = require('fs')
 let Path = require('path')
+let nock = require('nock')
 
 const { Readable, Writable } = require('stream');
 
@@ -24,6 +25,7 @@ let azConfigPath = process.env.AZ_CONFIG_PATH
 let awsConfigPath = process.env.AWS_CONFIG_PATH
 let diskConfigPath = process.env.DISK_CONFIG_PATH
 let gcConfigPath = process.env.GC_CONFIG_PATH
+let ghConfigPath = process.env.GH_CONFIG_PATH
 
 const testWIFs = [
   'L4kMoaVivcd1FMPPwRU9XT2PdKHPob3oo6YmgTBHrnBHMmo7GcCf',
@@ -118,6 +120,12 @@ function makeMockedS3Driver() {
     'aws-sdk/clients/s3': S3Class
   })
   return { driver, dataMap }
+}
+
+function makeMockedGhDriver() {
+  const dataMap = []
+  let bucketname = ''
+
 }
 
 class MockWriteStream extends Writable {
@@ -845,6 +853,67 @@ function testHttpPost() {
   })
 }
 
+function testGhDriver() {
+  let config = {
+    ghConfig: {
+      authtype: "token",
+      token: "1234567890ABCDEFGH",
+      owner: "testowner",
+      repo: "testrepo"
+    },
+    bucket: "spokes"
+  }
+  let mockTest = true
+
+  if (ghConfigPath) {
+    config = JSON.parse(fs.readFileSync(ghConfigPath))
+    mockTest = false
+  }
+
+  const GhDriver = require('../lib/server/drivers/GhDriver')
+
+  test('GitHub - Write', (t) => {
+    if (mockTest) {
+      nock('https://api.github.com')
+      .get(`/repos/${config.ghConfig.owner}/${config.ghConfig.repo}/contents/testfile.dat`)
+      .reply(200, {})
+    }
+    const driver = new GhDriver(config)
+    const prefix = driver.getReadURLPrefix()
+
+    const s = new Readable()
+    s._read = function noop() {}
+    s.push('hellow world')
+    s.push(null)
+
+    driver.performWrite(
+      {path: '../foo.js'})
+      .then(() => t.ok(false, 'Should have thrown'))
+      .catch((err) => t.equal(err.message, 'Invalid Path', 'Should throw bad path'))
+      .then(() => driver.performWrite(
+        {
+          path: 'testfile.dat',
+          storageTopLevel: '12345',
+          stream: s,
+          contentType: 'application/octet-stream',
+          contentLength: 12
+        }))
+      .then((readUrl) => {
+        t.ok(readUrl.startsWith(prefix), `${readUrl} must start with readUrlPrefix ${prefix}`)
+        return fetch(readUrl)
+      })
+      .then((resp) => resp.text())
+      .then((resptxt) => t.equal(resptxt, 'hello world', `Must get back hello world: got back: ${resptxt}`))
+      .then(() => driver.listFiles('12345'))
+      .then((files) => {
+        t.equal(files.entries.length, 1, 'Should return one file')
+        t.equal(files.entries[0], 'testfile.dat', 'Should be testfile.dat!')
+      })
+      .catch((err) => t.false(true, `Unexpected err: ${err}`))
+      .then(() => { FetchMock.restore(); t.end() })
+  })
+}
+
 
 testServer()
 testAuth()
@@ -853,3 +922,4 @@ testS3Driver()
 testDiskDriver()
 testGcDriver()
 testHttpPost()
+testGhDriver()
