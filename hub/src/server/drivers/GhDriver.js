@@ -86,6 +86,7 @@ class GhDriver implements DriverModel {
             baseUrl: baseurl
         })
 
+        logger.info('about to authenticate to GitHub')
         this.oc.authenticate({
             type: authtype,
             token: token
@@ -110,7 +111,7 @@ class GhDriver implements DriverModel {
     }): Promise < string > {
 
         if (!GhDriver.isPathValid(args.path)) {
-            return Promise.reject(new BadPathError('Inavlid path'))
+            return Promise.reject(new BadPathError('Invalid Path'))
         }
 
         const contentPath = `${args.storageTopLevel}/${args.path}`
@@ -126,20 +127,31 @@ class GhDriver implements DriverModel {
             committer: {
                 name: 'gaia',
                 email: 'someone@somewhere'
-            }
+            },
+            content: ''
         }
 
         // return new Promise((resolve, reject) => {
-        return new Promise((resolve) => {
-            this.oc.repos.createFile(ghParams).then(results => {
-                //TODO: test for failure
-
-                logger.debug(`stored ${contentPath} with commit ${results.data.commit.sha}`)
-                return resolve(downloadPath)
+        return new Promise((resolve, reject) => {
+            let contents = ''
+            args.stream.on('data', function(chunk) {
+                contents = contents + chunk
             })
+            .on('end', function () {
+                ghParams.content = contents
+                this.oc.repos.createFile(ghParams).then(results => {
+                    //TODO: test for failure
+    
+                    logger.debug(`stored ${contentPath} with commit ${results.data.commit.sha}`)
+                    return resolve(downloadPath)
+                })
+            })
+            .on('error', (err) => {
+                logger.error(`failed to store ${contentPath} using GitHub driver`)
+                reject(new Error('GitHub storage driver failed: failed to write file' +
+                    `${contentPath} in bucket ${this.bucket}: ${err}}`))
+            })            
         })
-
-
     }
 
     listFiles(storageTopLevel: string, page: ? string) {

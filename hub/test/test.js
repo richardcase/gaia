@@ -915,11 +915,11 @@ function testGhDriver() {
 }
 
 
-testServer()
-testAuth()
-testAzDriver()
-testS3Driver()
-testDiskDriver()
-testGcDriver()
-testHttpPost()
+//testServer()
+//testAuth()
+//testAzDriver()
+//testS3Driver()
+//testDiskDriver()
+//testGcDriver()
+//testHttpPost()
 testGhDriver()
